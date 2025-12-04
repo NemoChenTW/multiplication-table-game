@@ -5,23 +5,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>九九乘法特訓班</title>
     <style>
-        /* CSS 部分保持不變，針對行動裝置微調 */
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f0f8ff; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
         .container { background: white; padding: 2rem; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); width: 90%; max-width: 500px; text-align: center; }
         h1 { color: #333; margin-bottom: 20px; }
 
-        /* 設定畫面 */
         .checkbox-group { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 20px; }
         .checkbox-label { display: block; background: #e0e0e0; padding: 10px; border-radius: 8px; cursor: pointer; user-select: none; transition: 0.2s; position: relative; }
         .checkbox-label input { position: absolute; opacity: 0; cursor: pointer; height: 0; width: 0; }
         .checkbox-label.checked { background: #4CAF50; color: white; font-weight: bold; transform: scale(1.05); }
 
-        /* 測驗畫面 */
         .quiz-area { display: none; }
         .question { font-size: 3rem; font-weight: bold; color: #2c3e50; margin: 20px 0; }
 
-        /* 輸入框樣式優化 */
-        input[type="number"] {
+        /* 輸入框樣式 */
+        input {
             font-size: 2rem;
             width: 150px;
             text-align: center;
@@ -29,35 +26,30 @@
             border: 2px solid #ddd;
             border-radius: 10px;
             outline: none;
-            /* 防止 iOS Safari 在輸入框放大 */
-            transform: translateZ(0);
+            transform: translateZ(0); /* 優化 iOS 渲染 */
+            -webkit-appearance: none; /* 移除 iOS 預設樣式 */
         }
-        input[type="number"]:focus { border-color: #4CAF50; }
+        input:focus { border-color: #4CAF50; }
 
-        /* 計時器條 */
         .timer-bar-bg { width: 100%; height: 10px; background: #ddd; border-radius: 5px; margin: 20px 0; overflow: hidden; }
         .timer-bar { height: 100%; background: #4CAF50; width: 100%; transition: width 0.1s linear, background-color 0.5s; }
 
-        /* 按鈕與回饋 */
         .btn { background: #2196F3; color: white; border: none; padding: 12px 24px; font-size: 1.2rem; border-radius: 8px; cursor: pointer; margin-top: 15px; width: 100%; transition: 0.2s; }
         .btn:hover { background: #1976D2; }
         .btn:disabled { background: #ccc; cursor: not-allowed; }
 
         .score-board { font-size: 1.2rem; margin-top: 15px; color: #666; display: flex; justify-content: space-between; }
 
-        /* 結果畫面 */
         .result-area { display: none; }
         .final-score { font-size: 4rem; color: #4CAF50; font-weight: bold; }
         .wrong-list { text-align: left; margin-top: 20px; background: #fff3f3; padding: 15px; border-radius: 10px; display: none; }
         .wrong-item { border-bottom: 1px solid #ffcdd2; padding: 5px 0; font-size: 1.1rem; color: #d32f2f; }
 
-        /* 答錯/答對特效 (Overlay) */
         .feedback {
             position: fixed; top: 0; left: 0; right: 0; bottom: 0;
             background: rgba(0,0,0,0.8);
             display: flex; justify-content: center; align-items: center;
             color: white; font-size: 2rem; z-index: 100; display: none; flex-direction: column;
-            /* 讓點擊事件穿透 overlay，避免搶走 input focus (視情況而定，這裡我們用 JS 控制) */
         }
         .feedback span { margin-top: 10px; font-size: 1.5rem; color: #ffd700; }
         .continue-hint { font-size: 1rem; color: #fff; margin-top: 15px; opacity: 0.8; }
@@ -69,8 +61,7 @@
     <div id="setupScreen">
         <h1>九九乘法特訓</h1>
         <p>請選擇要練習的乘法表：</p>
-        <div class="checkbox-group" id="checkboxGroup">
-            </div>
+        <div class="checkbox-group" id="checkboxGroup"></div>
         <button class="btn" onclick="startQuiz()">開始挑戰</button>
     </div>
 
@@ -87,13 +78,14 @@
         <div class="question" id="questionText">2 x 2 = ?</div>
 
         <input
-            type="number"
+            type="tel"
             inputmode="numeric"
             pattern="[0-9]*"
             id="answerInput"
             placeholder="?"
             autocomplete="off"
             onkeydown="checkEnter(event)"
+            oninput="this.value = this.value.replace(/[^0-9]/g, '');"
         >
 
         <button class="btn" onclick="submitAnswer()">送出答案</button>
@@ -121,7 +113,6 @@
 </div>
 
 <script>
-    // 遊戲變數
     let selectedTables = [];
     let currentQuestion = {};
     let currentQIndex = 0;
@@ -133,44 +124,32 @@
     const totalQuestions = 10;
     const maxTime = 10000;
 
-    // 生成 2-9 的選項
     const checkboxGroup = document.getElementById('checkboxGroup');
     for(let i=2; i<=9; i++){
         let label = document.createElement('label');
         label.className = 'checkbox-label';
-
         let span = document.createElement('span');
         span.innerText = i;
-
         let input = document.createElement('input');
         input.type = 'checkbox';
         input.value = i;
-
         input.addEventListener('change', function() {
-            if(this.checked) {
-                label.classList.add('checked');
-            } else {
-                label.classList.remove('checked');
-            }
+            if(this.checked) label.classList.add('checked');
+            else label.classList.remove('checked');
         });
-
         label.appendChild(span);
         label.appendChild(input);
         checkboxGroup.appendChild(label);
     }
 
-    // **關鍵邏輯 1：統一的 Enter 處理**
-    // 由於輸入框一直保持 focus，所有的 Enter 都會來到這裡
     function checkEnter(event) {
         if (event.key === 'Enter') {
             event.stopPropagation();
             event.preventDefault();
-
-            // 判斷現在是「答題」還是「看結果中」
             if (document.getElementById('feedbackModal').style.display === 'flex') {
-                closeFeedback(); // 如果彈窗開著，Enter 代表關閉彈窗
+                closeFeedback();
             } else {
-                submitAnswer(); // 如果彈窗沒開，Enter 代表送出答案
+                submitAnswer();
             }
         }
     }
@@ -212,7 +191,6 @@
         document.getElementById('questionText').innerText = `${num1} x ${num2} = ?`;
 
         let inputField = document.getElementById('answerInput');
-        // 切題時清空輸入框，並確保 focus
         inputField.value = '';
         inputField.focus();
 
@@ -222,12 +200,10 @@
     function startTimer() {
         timeLeft = maxTime;
         updateTimerVisual();
-
         clearInterval(timerInterval);
         timerInterval = setInterval(() => {
             timeLeft -= 100;
             updateTimerVisual();
-
             if (timeLeft <= 0) {
                 clearInterval(timerInterval);
                 handleTimeUp();
@@ -239,22 +215,14 @@
         let percentage = (timeLeft / maxTime) * 100;
         let bar = document.getElementById('timerBar');
         bar.style.width = percentage + '%';
-
-        if (timeLeft > 5000) {
-            bar.style.backgroundColor = '#4CAF50';
-        } else if (timeLeft > 2000) {
-            bar.style.backgroundColor = '#FF9800';
-        } else {
-            bar.style.backgroundColor = '#F44336';
-        }
+        if (timeLeft > 5000) bar.style.backgroundColor = '#4CAF50';
+        else if (timeLeft > 2000) bar.style.backgroundColor = '#FF9800';
+        else bar.style.backgroundColor = '#F44336';
     }
 
     function calculatePoints() {
-        if (timeLeft > 5000) {
-            return 10;
-        }
-        let elapsedSecondsInPenalty = (5000 - timeLeft) / 1000;
-        let penalty = Math.ceil(elapsedSecondsInPenalty) * 2;
+        if (timeLeft > 5000) return 10;
+        let penalty = Math.ceil((5000 - timeLeft) / 1000) * 2;
         let points = 10 - penalty;
         return points > 0 ? points : 0;
     }
@@ -292,9 +260,6 @@
         let hint = document.getElementById('continueHint');
         let inputField = document.getElementById('answerInput');
 
-        // **關鍵邏輯 2：保持 Focus**
-        // 絕對不要 blur()，否則鍵盤會收起來。
-        // 我們直接清空 value，讓使用者覺得已經送出了，但其實游標還在
         inputField.value = '';
         inputField.focus();
 
@@ -305,26 +270,19 @@
             text.innerText = "答對了！";
             correctText.innerText = `+ ${points} 分`;
             hint.style.display = 'none';
-
-            feedbackTimeout = setTimeout(() => {
-                closeFeedback();
-            }, 800);
+            feedbackTimeout = setTimeout(() => { closeFeedback(); }, 800);
         } else {
             modal.style.backgroundColor = 'rgba(244, 67, 54, 0.9)';
             text.innerText = isTimeout ? "時間到！" : "答錯囉！";
             correctText.innerText = `正確答案是： ${currentQuestion.ans}`;
             hint.style.display = 'block';
-
-            // 答錯時，我們不設自動關閉，等待使用者按 Enter (會觸發 checkEnter) 或點擊按鈕
         }
     }
 
     function closeFeedback() {
         clearTimeout(feedbackTimeout);
-
         let modal = document.getElementById('feedbackModal');
         if(modal.style.display === 'none') return;
-
         modal.style.display = 'none';
         currentQIndex++;
         nextQuestion();
@@ -334,8 +292,6 @@
         document.getElementById('quizScreen').style.display = 'none';
         document.getElementById('resultScreen').style.display = 'block';
         document.getElementById('finalScore').innerText = score;
-
-        // 測驗結束時，這裡可以 blur 收起鍵盤
         document.getElementById('answerInput').blur();
 
         let wrongListDiv = document.getElementById('wrongList');
