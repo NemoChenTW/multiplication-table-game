@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>九九乘法特訓班</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f0f8ff; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
+        .container { background: white; padding: 2rem; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); width: 90%; max-width: 500px; text-align: center; }
+        h1 { color: #333; margin-bottom: 20px; }
+
+        /* 設定畫面 */
+        .checkbox-group { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 20px; }
+        .checkbox-label { display: block; background: #e0e0e0; padding: 10px; border-radius: 8px; cursor: pointer; user-select: none; transition: 0.2s; position: relative; }
+        .checkbox-label input { position: absolute; opacity: 0; cursor: pointer; height: 0; width: 0; }
+        .checkbox-label.checked { background: #4CAF50; color: white; font-weight: bold; transform: scale(1.05); }
+
+        /* 測驗畫面 */
+        .quiz-area { display: none; }
+        .question { font-size: 3rem; font-weight: bold; color: #2c3e50; margin: 20px 0; }
+        input[type="number"] { font-size: 2rem; width: 150px; text-align: center; padding: 10px; border: 2px solid #ddd; border-radius: 10px; outline: none; }
+        input[type="number"]:focus { border-color: #4CAF50; }
+
+        /* 計時器條 */
+        .timer-bar-bg { width: 100%; height: 10px; background: #ddd; border-radius: 5px; margin: 20px 0; overflow: hidden; }
+        .timer-bar { height: 100%; background: #4CAF50; width: 100%; transition: width 0.1s linear, background-color 0.5s; }
+
+        /* 按鈕與回饋 */
+        .btn { background: #2196F3; color: white; border: none; padding: 12px 24px; font-size: 1.2rem; border-radius: 8px; cursor: pointer; margin-top: 15px; width: 100%; transition: 0.2s; }
+        .btn:hover { background: #1976D2; }
+        .btn:disabled { background: #ccc; cursor: not-allowed; }
+
+        .score-board { font-size: 1.2rem; margin-top: 15px; color: #666; display: flex; justify-content: space-between; }
+
+        /* 結果畫面 */
+        .result-area { display: none; }
+        .final-score { font-size: 4rem; color: #4CAF50; font-weight: bold; }
+        .wrong-list { text-align: left; margin-top: 20px; background: #fff3f3; padding: 15px; border-radius: 10px; display: none; }
+        .wrong-item { border-bottom: 1px solid #ffcdd2; padding: 5px 0; font-size: 1.1rem; color: #d32f2f; }
+
+        /* 答錯/答對特效 */
+        .feedback { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); display: flex; justify-content: center; align-items: center; color: white; font-size: 2rem; z-index: 100; display: none; flex-direction: column;}
+        .feedback span { margin-top: 10px; font-size: 1.5rem; color: #ffd700; }
+        .continue-hint { font-size: 1rem; color: #fff; margin-top: 15px; opacity: 0.8; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div id="setupScreen">
+        <h1>九九乘法特訓</h1>
+        <p>請選擇要練習的乘法表：</p>
+        <div class="checkbox-group" id="checkboxGroup">
+            </div>
+        <button class="btn" onclick="startQuiz()">開始挑戰</button>
+    </div>
+
+    <div id="quizScreen" class="quiz-area">
+        <div class="score-board">
+            <span id="qCount">第 1 / 10 題</span>
+            <span id="currentScoreDisp">得分: 0</span>
+        </div>
+
+        <div class="timer-bar-bg">
+            <div id="timerBar" class="timer-bar"></div>
+        </div>
+
+        <div class="question" id="questionText">2 x 2 = ?</div>
+        <input type="number" id="answerInput" placeholder="?" onkeydown="checkEnter(event)">
+        <button class="btn" onclick="submitAnswer()">送出答案</button>
+    </div>
+
+    <div id="resultScreen" class="result-area">
+        <h1>測驗結束</h1>
+        <p>總得分</p>
+        <div class="final-score" id="finalScore">0</div>
+
+        <div id="wrongList" class="wrong-list">
+            <h3>需要複習的題目：</h3>
+            <div id="wrongItems"></div>
+        </div>
+
+        <button class="btn" onclick="resetGame()">再玩一次</button>
+    </div>
+</div>
+
+<div id="feedbackModal" class="feedback">
+    <div id="feedbackText">錯誤!</div>
+    <span id="correctAnswerText"></span>
+    <div class="continue-hint" id="continueHint">按 Enter 繼續</div>
+    <button class="btn" style="width: auto; margin-top: 20px; background: white; color: black;" onclick="closeFeedback()">繼續</button>
+</div>
+
+<script>
+    // 遊戲變數
+    let selectedTables = [];
+    let currentQuestion = {};
+    let currentQIndex = 0;
+    let score = 0;
+    let timerInterval;
+    let feedbackTimeout;
+    let timeLeft = 10000;
+    let wrongAnswers = [];
+    const totalQuestions = 10;
+    const maxTime = 10000;
+
+    // **【新增】** 處理彈窗 Enter 的專門函式
+    function handleModalEnter(event) {
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            closeFeedback();
+        }
+    }
+
+    // 產生 2-9 的選項
+    const checkboxGroup = document.getElementById('checkboxGroup');
+    for(let i=2; i<=9; i++){
+        let label = document.createElement('label');
+        label.className = 'checkbox-label';
+
+        let span = document.createElement('span');
+        span.innerText = i;
+
+        let input = document.createElement('input');
+        input.type = 'checkbox';
+        input.value = i;
+
+        input.addEventListener('change', function() {
+            if(this.checked) {
+                label.classList.add('checked');
+            } else {
+                label.classList.remove('checked');
+            }
+        });
+
+        label.appendChild(span);
+        label.appendChild(input);
+        checkboxGroup.appendChild(label);
+    }
+
+    // **【移除】** 舊有的 document.addEventListener('keydown', ...) 全域監聽器
+
+    // 處理輸入框的 Enter
+    function checkEnter(event) {
+        if (event.key === 'Enter') {
+            event.stopPropagation();
+            event.preventDefault();
+
+            // 由於監聽器已動態註冊，這個檢查理論上不需要，但保留可增加安全性
+            if (document.getElementById('feedbackModal').style.display === 'flex') return;
+            submitAnswer();
+        }
+    }
+
+    function startQuiz() {
+        selectedTables = [];
+        document.querySelectorAll('input[type=checkbox]:checked').forEach(cb => {
+            selectedTables.push(parseInt(cb.value));
+        });
+
+        if (selectedTables.length === 0) {
+            alert("請至少選擇一個乘法表！");
+            return;
+        }
+
+        score = 0;
+        currentQIndex = 0;
+        wrongAnswers = [];
+        document.getElementById('setupScreen').style.display = 'none';
+        document.getElementById('quizScreen').style.display = 'block';
+        document.getElementById('resultScreen').style.display = 'none';
+
+        nextQuestion();
+    }
+
+    function nextQuestion() {
+        if (currentQIndex >= totalQuestions) {
+            endQuiz();
+            return;
+        }
+
+        let num1 = selectedTables[Math.floor(Math.random() * selectedTables.length)];
+        let num2 = Math.floor(Math.random() * 9) + 1;
+
+        currentQuestion = { num1, num2, ans: num1 * num2 };
+
+        document.getElementById('qCount').innerText = `第 ${currentQIndex + 1} / ${totalQuestions} 題`;
+        document.getElementById('currentScoreDisp').innerText = `得分: ${score}`;
+        document.getElementById('questionText').innerText = `${num1} x ${num2} = ?`;
+
+        let inputField = document.getElementById('answerInput');
+        inputField.value = '';
+        inputField.focus();
+
+        startTimer();
+    }
+
+    function startTimer() {
+        timeLeft = maxTime;
+        updateTimerVisual();
+
+        clearInterval(timerInterval);
+        timerInterval = setInterval(() => {
+            timeLeft -= 100;
+            updateTimerVisual();
+
+            if (timeLeft <= 0) {
+                clearInterval(timerInterval);
+                handleTimeUp();
+            }
+        }, 100);
+    }
+
+    function updateTimerVisual() {
+        let percentage = (timeLeft / maxTime) * 100;
+        let bar = document.getElementById('timerBar');
+        bar.style.width = percentage + '%';
+
+        if (timeLeft > 5000) {
+            bar.style.backgroundColor = '#4CAF50';
+        } else if (timeLeft > 2000) {
+            bar.style.backgroundColor = '#FF9800';
+        } else {
+            bar.style.backgroundColor = '#F44336';
+        }
+    }
+
+    function calculatePoints() {
+        if (timeLeft > 5000) {
+            return 10;
+        }
+        let elapsedSecondsInPenalty = (5000 - timeLeft) / 1000;
+        let penalty = Math.ceil(elapsedSecondsInPenalty) * 2;
+        let points = 10 - penalty;
+        return points > 0 ? points : 0;
+    }
+
+    function submitAnswer() {
+        let input = document.getElementById('answerInput').value;
+        if (input === '') return;
+
+        clearInterval(timerInterval);
+        let userAns = parseInt(input);
+
+        if (userAns === currentQuestion.ans) {
+            let points = calculatePoints();
+            score += points;
+            showFeedback(true, points);
+        } else {
+            recordWrong();
+            showFeedback(false, 0);
+        }
+    }
+
+    function handleTimeUp() {
+        recordWrong();
+        showFeedback(false, 0, true);
+    }
+
+    function recordWrong() {
+        wrongAnswers.push(`${currentQuestion.num1} x ${currentQuestion.num2} = ${currentQuestion.ans}`);
+    }
+
+    function showFeedback(isCorrect, points, isTimeout = false) {
+        let modal = document.getElementById('feedbackModal');
+        let text = document.getElementById('feedbackText');
+        let correctText = document.getElementById('correctAnswerText');
+        let hint = document.getElementById('continueHint');
+
+        // **【關鍵修正】**：強制讓輸入框失去焦點，確保 Enter 鍵能正確冒泡到 document 監聽器
+        document.getElementById('answerInput').blur();
+
+        modal.style.display = 'flex';
+
+        if (isCorrect) {
+            modal.style.backgroundColor = 'rgba(76, 175, 80, 0.9)';
+            text.innerText = "答對了！";
+            correctText.innerText = `+ ${points} 分`;
+            hint.style.display = 'none';
+
+            feedbackTimeout = setTimeout(() => {
+                closeFeedback();
+            }, 800);
+        } else {
+            modal.style.backgroundColor = 'rgba(244, 67, 54, 0.9)';
+            text.innerText = isTimeout ? "時間到！" : "答錯囉！";
+            correctText.innerText = `正確答案是： ${currentQuestion.ans}`;
+            hint.style.display = 'block';
+
+            document.addEventListener('keydown', handleModalEnter);
+        }
+    }
+
+    function closeFeedback() {
+        // **【關鍵修正】**：不論是自動或手動關閉，都要移除監聽器
+        document.removeEventListener('keydown', handleModalEnter);
+
+        clearTimeout(feedbackTimeout);
+
+        let modal = document.getElementById('feedbackModal');
+        if(modal.style.display === 'none') return;
+
+        modal.style.display = 'none';
+        currentQIndex++;
+        nextQuestion();
+    }
+
+    function endQuiz() {
+        document.getElementById('quizScreen').style.display = 'none';
+        document.getElementById('resultScreen').style.display = 'block';
+        document.getElementById('finalScore').innerText = score;
+
+        let wrongListDiv = document.getElementById('wrongList');
+        let wrongItemsDiv = document.getElementById('wrongItems');
+        wrongItemsDiv.innerHTML = '';
+
+        if (wrongAnswers.length > 0) {
+            wrongListDiv.style.display = 'block';
+            wrongAnswers.forEach(item => {
+                let div = document.createElement('div');
+                div.className = 'wrong-item';
+                div.innerText = item;
+                wrongItemsDiv.appendChild(div);
+            });
+        } else {
+            wrongListDiv.style.display = 'none';
+        }
+    }
+
+    function resetGame() {
+        document.getElementById('setupScreen').style.display = 'block';
+        document.getElementById('resultScreen').style.display = 'none';
+    }
+</script>
+
+</body>
+</html>
