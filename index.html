@@ -17,7 +17,7 @@
         .quiz-area { display: none; }
         .question { font-size: 3rem; font-weight: bold; color: #2c3e50; margin: 20px 0; }
 
-        /* 輸入框樣式 */
+        /* 輸入框樣式 - 優化 iOS 顯示 */
         input {
             font-size: 2rem;
             width: 150px;
@@ -26,17 +26,37 @@
             border: 2px solid #ddd;
             border-radius: 10px;
             outline: none;
-            transform: translateZ(0); /* 優化 iOS 渲染 */
+            transform: translateZ(0);
             -webkit-appearance: none; /* 移除 iOS 預設樣式 */
+            margin: 0; /* 修正部分瀏覽器外距 */
         }
         input:focus { border-color: #4CAF50; }
 
         .timer-bar-bg { width: 100%; height: 10px; background: #ddd; border-radius: 5px; margin: 20px 0; overflow: hidden; }
         .timer-bar { height: 100%; background: #4CAF50; width: 100%; transition: width 0.1s linear, background-color 0.5s; }
 
-        /* 按鈕群組 */
+        /* 按鈕群組與樣式修正 */
         .btn-group { display: flex; gap: 10px; margin-top: 15px; }
-        .btn { background: #2196F3; color: white; border: none; padding: 12px 0; font-size: 1.2rem; border-radius: 8px; cursor: pointer; flex: 1; transition: 0.2s; }
+
+        .btn {
+            background: #2196F3;
+            color: white;
+            border: none;
+            padding: 12px 0;
+            font-size: 1.2rem;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: 0.2s;
+            width: 100%; /* 預設滿寬 */
+            /* 移除 flex: 1，避免在 column layout 中被垂直拉伸 */
+        }
+
+        /* 只有在群組內的按鈕才自動平分寬度 */
+        .btn-group .btn {
+            flex: 1;
+            width: auto;
+        }
+
         .btn:hover { background: #1976D2; }
         .btn:disabled { background: #ccc; cursor: not-allowed; }
 
@@ -121,7 +141,7 @@
             oninput="this.value = this.value.replace(/[^0-9]/g, '');"
         >
 
-        <button class="btn" onclick="submitAnswer()" style="margin-top: 15px; width: 100%;">送出答案</button>
+        <button class="btn" onclick="submitAnswer()" style="margin-top: 15px;">送出答案</button>
     </div>
 
     <div id="resultScreen" class="result-area">
@@ -134,7 +154,7 @@
             <div id="wrongItems"></div>
         </div>
 
-        <button class="btn" onclick="resetGame()" style="margin-top: 15px; width: 100%;">再玩一次</button>
+        <button class="btn" onclick="resetGame()" style="margin-top: 15px;">再玩一次</button>
     </div>
 </div>
 
@@ -151,7 +171,7 @@
     <div id="feedbackText">錯誤!</div>
     <span id="correctAnswerText"></span>
     <div class="continue-hint" id="continueHint">按 Enter 繼續</div>
-    <button class="btn" style="width: auto; margin-top: 20px; background: white; color: black;" onclick="closeFeedback()">繼續</button>
+    <button class="btn" style="width: auto; margin-top: 20px; padding-inline: 10px; background: white; color: black;" onclick="closeFeedback()">繼續</button>
 </div>
 
 <script>
@@ -196,7 +216,6 @@
         }
     }
 
-    // 新增：顯示複習表
     function showReview() {
         let tempSelected = [];
         document.querySelectorAll('input[type=checkbox]:checked').forEach(cb => {
@@ -230,7 +249,6 @@
         document.getElementById('reviewModal').style.display = 'flex';
     }
 
-    // 新增：關閉複習表
     function closeReview() {
         document.getElementById('reviewModal').style.display = 'none';
     }
